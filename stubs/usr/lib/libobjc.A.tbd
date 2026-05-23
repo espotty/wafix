@@ -1,0 +1,27 @@
+--- !tapi-tbd
+tbd-version:     4
+targets:         [ arm64-ios ]
+install-name:    '/usr/lib/libobjc.A.dylib'
+exports:
+  - targets:         [ arm64-ios ]
+    symbols:
+      - _objc_getClass
+      - _sel_registerName
+      - _objc_msgSend
+      - _objc_alloc
+      - _objc_release
+      - _objc_autoreleaseReturnValue
+      - _objc_retainAutorelease
+      - _objc_retainAutoreleaseReturnValue
+      - _objc_retainAutoreleasedReturnValue
+      - _class_getClassMethod
+      - _class_getInstanceMethod
+      - _method_getImplementation
+      - _method_setImplementation
+      - _objc_copyClassList
+      - _objc_getMetaClass
+      - _method_exchangeImplementations
+      - _class_replaceMethod
+      - _objc_getClassList
+      - _class_getName
+...
