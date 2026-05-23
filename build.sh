@@ -20,8 +20,16 @@ clang \
     -c WASendFix.c \
     -o output/WASendFix.o
 
+# Use ld64.lld if available, otherwise fall back to Apple ld (xcrun)
+if command -v ld64.lld &>/dev/null; then
+    LINKER="ld64.lld"
+else
+    LINKER="$(xcrun -f ld)"
+    echo "[*] ld64.lld not found, using Apple ld: $LINKER"
+fi
+
 echo "[*] Linking Mach-O dylib → $OUT ..."
-ld64.lld \
+"$LINKER" \
     -arch arm64 \
     -platform_version ios 14.0.0 14.0.0 \
     -dylib \
