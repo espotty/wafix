@@ -1,0 +1,61 @@
+name: Auto-update for new WhatsApp versions
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6am
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check latest WhatsApp version on App Store
+        id: wa_version
+        run: |
+          LATEST=$(curl -s "https://itunes.apple.com/lookup?bundleId=net.whatsapp.WhatsApp&country=us" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['results'][0]['version'])")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest WhatsApp version: $LATEST"
+
+          CURRENT=$(grep 'g_spoofedVersion' WASendFix.c | grep -o '"[0-9.]*"' | tr -d '"' | head -1)
+          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+          echo "Current version in code: $CURRENT"
+
+          if [ "$LATEST" != "$CURRENT" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "UPDATE NEEDED: $CURRENT → $LATEST"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No update needed."
+          fi
+
+      - name: Update version strings in WASendFix.c
+        if: steps.wa_version.outputs.changed == 'true'
+        run: |
+          LATEST="${{ steps.wa_version.outputs.latest }}"
+          CURRENT="${{ steps.wa_version.outputs.current }}"
+
+          # Update spoofed version
+          sed -i "s/\"${CURRENT}\"/\"${LATEST}\"/g" WASendFix.c
+
+          # Update User-Agent string
+          sed -i "s/WhatsApp\/[0-9.]*/WhatsApp\/${LATEST}/g" WASendFix.c
+
+          echo "Updated to $LATEST"
+          grep -E 'g_spoofedVersion|spoofedUA' WASendFix.c | head -5
+
+      - name: Commit and push update
+        if: steps.wa_version.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add WASendFix.c
+          git commit -m "auto: update spoofed version to ${{ steps.wa_version.outputs.latest }}"
+          git push
+
+      - name: No update needed
+        if: steps.wa_version.outputs.changed == 'false'
+        run: echo "WhatsApp version unchanged (${{ steps.wa_version.outputs.current }}), nothing to do."
