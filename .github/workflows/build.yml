@@ -12,15 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM
-        run: brew install llvm
-
-      - name: Debug LLVM bins
-        run: ls /opt/homebrew/opt/llvm/bin/ | grep -i "ld\|lld"
-
       - name: Build WASendFix.dylib
         run: |
-          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
           mkdir -p output
           bash build.sh
 
