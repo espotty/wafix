@@ -44,6 +44,12 @@ static int fake_WABuildVersionComponent3(void)              { return 99; }
 static int fake_WABuildVersionComponent4(void)              { return 99; }
 static void fake_WAHandleFailureInFunction(void)            { return; }
 
+// Hook abort() itself in SharedModules' GOT.
+// WAHandleFailureInFunction calls abort() as an *external* import
+// (goes through the GOT), so this intercepts it even though
+// WAHandleFailureInFunction itself is called via a direct internal branch.
+static void fake_abort(void)                                { return; }
+
 static unsigned int pb_ret3(id self, SEL cmd)  { (void)self;(void)cmd; return 3;  }
 static unsigned int pb_ret99(id self, SEL cmd) { (void)self;(void)cmd; return 99; }
 
@@ -91,8 +97,11 @@ static struct hook_entry g_hooks[] = {
     { "_WABuildVersionComponent2",              (void*)fake_WABuildVersionComponent2 },
     { "_WABuildVersionComponent3",              (void*)fake_WABuildVersionComponent3 },
     { "_WABuildVersionComponent4",              (void*)fake_WABuildVersionComponent4 },
+    // Hook abort() in SharedModules' GOT so WAHandleFailureInFunction
+    // becomes a no-op even when called via direct internal branches.
+    { "_abort",                                 (void*)fake_abort },
 };
-#define N_HOOKS 9
+#define N_HOOKS 10
 
 static void rebind_imports_in_image(const struct mach_header_64 *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
@@ -188,7 +197,7 @@ next:
             if (strx == 0 || strx >= strsize) continue;
 
             const char *sn = strtab + strx;
-            if (sn[0] != '_' || sn[1] != 'W' || sn[2] != 'A') continue;
+            if (sn[0] != '_') continue;
 
             for (int h = 0; h < N_HOOKS; h++) {
                 if (name_match(sn, g_hooks[h].name)) {
