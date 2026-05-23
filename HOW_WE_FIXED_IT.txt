@@ -1,0 +1,71 @@
+WhatsApp 25.1.83 - iOS 14.8 Fix (WASendFix.dylib)
+==================================================
+
+المشكلة:
+واتساب 25.1.83 على iOS 14.8 (iPhone 12 Pro Max) بيرفض يشتغل.
+بيظهر شاشة "حدث نسختك" أو "نظامك قديم" وكمان السيرفر بيرفض الاتصال
+لأنه بيشوف إن نسخة iOS قديمة.
+
+ايه اللي عملناه:
+أول حاجة استخدمنا Frida عشان نفهم المشكلة ونجرب الحلول.
+لقينا إن واتساب بيعمل كذا check:
+
+1. بيشيك على نسخة البيلد (WABuildVersion) - لو قديمة بيقولك حدث
+2. بيشيك هل نظامك أقدم من الحد الأدنى (WAIsAfterDeprecatedPlatformCutoffDate)
+3. بيبعت نسخة iOS في الـ User-Agent للسيرفر - السيرفر بيرفض iOS 14
+4. بيبعت نسخة التطبيق في بروتوكول protobuf - السيرفر بيشيكها
+5. لو في تناقض بين النسخ بيعمل crash عن طريق WAHandleFailureInFunction
+
+الحل:
+عملنا dylib (مكتبة ديناميكية) بتتحقن في واتساب وقت التشغيل
+وبتعترض الـ functions دي وبترجع قيم مزيفة:
+
+- WABuildVersion → "3.99.99.99" (نسخة عالية وهمية)
+- WABuildHTTPUserAgentString → "WhatsApp/3.99.99.99 iOS/17.5.1 Device/iPhone_11_Pro_Max"
+- WAIsAfterDeprecatedPlatformCutoffDate → 0 (لا، مش بعد تاريخ الإيقاف)
+- WADeprecatedPlatformCutOffDate → تاريخ بعد 10 سنين
+- WAHandleFailureInFunction → مش بيعمل حاجة (no-op)
+- WABuildVersionComponent 1/2/3/4 → 3, 99, 99, 99
+
+وكمان بنعدل الـ protobuf objects اللي بتتبعت للسيرفر:
+- WAPBClientPayload_UserAgent_AppVersion: primary=3, secondary=99, tertiary=99, quaternary=99
+- WAPBClientPayload_UserAgent: osVersion="17.5.1", osBuildNumber="21F90"
+
+الطريقة التقنية:
+الـ dylib بيستخدم طريقتين للتعديل:
+
+1. Mach-O Indirect Symbol Rebinding:
+   بنمشي على جدول الـ imports (GOT) بتاع WhatsApp و SharedModules
+   وبنبدل الـ function pointers بتاعتنا مكان الأصلية.
+   كده أي كود بيستدعي WABuildVersion مثلاً هيروح للـ function بتاعتنا.
+
+2. ObjC Method Swizzling:
+   بنستخدم objc_getClass + class_getInstanceMethod + method_setImplementation
+   عشان نبدل الـ getter methods بتاعت الـ protobuf classes.
+
+المشاكل اللي واجهتنا وحليناها:
+
+- أول نسخة كانت بتعمل crash (SIGSEGV) لأن الـ Mach-O parsing
+  كان بيمشي على كل الـ images المحملة بما فيها الـ shared cache
+  اللي بيبقى فيها بنية مختلفة. الحل: بنفلتر ونمشي بس على
+  WhatsApp و SharedModules.
+
+- كان في bug في قيمة S_LAZY_SYMBOL_POINTERS (كانت 0xa بدل 0x7).
+  ده كان بيخلينا نبص على sections غلط ونكتب في أماكن غلط في الذاكرة.
+
+- استخدام objc_msgSend مع variadic casting كان بيعمل مشاكل
+  في الـ cross-compilation. الحل: استخدمنا CFStringCreateWithCString
+  و CFDateCreate من CoreFoundation مباشرة بدل ما نعدي على ObjC messaging.
+
+- الـ ObjC imageinfo كان فيه flag غلط (64 بدل 0).
+
+طريقة التنصيب:
+1. نزل WASendFix.dylib
+2. استخدم TrollFools عشان تحقنه في واتساب (بيتحط في مجلد Frameworks)
+3. افتح واتساب - هيشتغل عادي
+
+ملاحظات:
+- الـ dylib مش بيستخدم MSHookFunction أو CydiaSubstrate
+- بيشتغل على أي جهاز iOS 14+ مع jailbreak أو TrollFools
+- الـ strings والتواريخ محفوظة في الذاكرة طول ما التطبيق شغال
+- التاريخ الوهمي محسوب 10 سنين قدام فمش هينتهي قريب
