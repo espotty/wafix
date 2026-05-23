@@ -49,6 +49,7 @@ static void fake_WAHandleFailureInFunction(void)            { return; }
 // (goes through the GOT), so this intercepts it even though
 // WAHandleFailureInFunction itself is called via a direct internal branch.
 static void fake_abort(void)                                { return; }
+static void fake_assert_rtn(void)                           { return; }
 
 static unsigned int pb_ret3(id self, SEL cmd)  { (void)self;(void)cmd; return 3;  }
 static unsigned int pb_ret99(id self, SEL cmd) { (void)self;(void)cmd; return 99; }
@@ -97,11 +98,15 @@ static struct hook_entry g_hooks[] = {
     { "_WABuildVersionComponent2",              (void*)fake_WABuildVersionComponent2 },
     { "_WABuildVersionComponent3",              (void*)fake_WABuildVersionComponent3 },
     { "_WABuildVersionComponent4",              (void*)fake_WABuildVersionComponent4 },
-    // Hook abort() in SharedModules' GOT so WAHandleFailureInFunction
-    // becomes a no-op even when called via direct internal branches.
+    // Hook abort() and __assert_rtn in SharedModules' GOT.
+    // WAHandleFailureInFunction calls abort() as an *external* import
+    // (goes through the GOT), so this intercepts it even though
+    // WAHandleFailureInFunction itself is called via a direct internal branch.
+    // __assert_rtn covers assertion-based failure paths in future WA versions.
     { "_abort",                                 (void*)fake_abort },
+    { "___assert_rtn",                          (void*)fake_assert_rtn },
 };
-#define N_HOOKS 10
+#define N_HOOKS 11
 
 static void rebind_imports_in_image(const struct mach_header_64 *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
