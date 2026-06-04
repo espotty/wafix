@@ -38,10 +38,10 @@ static id fake_WABuildVersion(void)                        { return g_spoofedVer
 static id fake_WABuildHTTPUserAgentString(void)             { return g_spoofedUA; }
 static int fake_WAIsAfterDeprecatedPlatformCutoffDate(void) { return 0; }
 static id fake_WADeprecatedPlatformCutOffDate(void)         { return g_futureDate; }
-static int fake_WABuildVersionComponent1(void)              { return 3; }
-static int fake_WABuildVersionComponent2(void)              { return 99; }
-static int fake_WABuildVersionComponent3(void)              { return 99; }
-static int fake_WABuildVersionComponent4(void)              { return 99; }
+static int fake_WABuildVersionComponent1(void)              { return 25; }
+static int fake_WABuildVersionComponent2(void)              { return 1; }
+static int fake_WABuildVersionComponent3(void)              { return 83; }
+static int fake_WABuildVersionComponent4(void)              { return 0; }
 static void fake_WAHandleFailureInFunction(void)            { return; }
 
 // Hook abort() itself in SharedModules' GOT.
@@ -51,8 +51,10 @@ static void fake_WAHandleFailureInFunction(void)            { return; }
 static void fake_abort(void)                                { return; }
 static void fake_assert_rtn(void)                           { return; }
 
-static unsigned int pb_ret3(id self, SEL cmd)  { (void)self;(void)cmd; return 3;  }
-static unsigned int pb_ret99(id self, SEL cmd) { (void)self;(void)cmd; return 99; }
+static unsigned int pb_ret25(id self, SEL cmd) { (void)self;(void)cmd; return 25; }
+static unsigned int pb_ret1(id self, SEL cmd)  { (void)self;(void)cmd; return 1;  }
+static unsigned int pb_ret83(id self, SEL cmd) { (void)self;(void)cmd; return 83; }
+static unsigned int pb_ret0(id self, SEL cmd)  { (void)self;(void)cmd; return 0;  }
 
 static id fake_osVersion_getter(id self, SEL cmd) {
     (void)self; (void)cmd;
@@ -234,10 +236,10 @@ static void hook_objc_classes(void) {
     Class cls = (Class)objc_getClass("WAPBClientPayload_UserAgent_AppVersion");
     if (cls) {
         struct { const char *n; IMP fn; } h[] = {
-            { "primary",    (IMP)pb_ret3  },
-            { "secondary",  (IMP)pb_ret99 },
-            { "tertiary",   (IMP)pb_ret99 },
-            { "quaternary", (IMP)pb_ret99 },
+            { "primary",    (IMP)pb_ret25 },
+            { "secondary",  (IMP)pb_ret1  },
+            { "tertiary",   (IMP)pb_ret83 },
+            { "quaternary", (IMP)pb_ret0  },
         };
         for (int i = 0; i < 4; i++) {
             Method m = class_getInstanceMethod(cls, sel_registerName(h[i].n));
