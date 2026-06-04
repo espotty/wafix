@@ -23,9 +23,9 @@ static id g_spoofedOsBuild   = NULL;
 static id g_futureDate       = NULL;
 
 static void create_objc_objects(void) {
-    g_spoofedVersion = (id)CFStringCreateWithCString(NULL, "26.21.74", kCFStringEncodingUTF8);
+    g_spoofedVersion = (id)CFStringCreateWithCString(NULL, "3.99.99.99", kCFStringEncodingUTF8);
     g_spoofedUA      = (id)CFStringCreateWithCString(NULL,
-                        "WhatsApp/26.21.74 iOS/17.5.1 Device/iPhone_11_Pro_Max",
+                        "WhatsApp/3.99.99.99 iOS/17.5.1 Device/iPhone_11_Pro_Max",
                         kCFStringEncodingUTF8);
     g_spoofedOsVersion = (id)CFStringCreateWithCString(NULL, "17.5.1", kCFStringEncodingUTF8);
     g_spoofedOsBuild   = (id)CFStringCreateWithCString(NULL, "21F90", kCFStringEncodingUTF8);
@@ -38,10 +38,10 @@ static id fake_WABuildVersion(void)                        { return g_spoofedVer
 static id fake_WABuildHTTPUserAgentString(void)             { return g_spoofedUA; }
 static int fake_WAIsAfterDeprecatedPlatformCutoffDate(void) { return 0; }
 static id fake_WADeprecatedPlatformCutOffDate(void)         { return g_futureDate; }
-static int fake_WABuildVersionComponent1(void)              { return 26; }
-static int fake_WABuildVersionComponent2(void)              { return 21; }
-static int fake_WABuildVersionComponent3(void)              { return 74; }
-static int fake_WABuildVersionComponent4(void)              { return 0; }
+static int fake_WABuildVersionComponent1(void)              { return 3; }
+static int fake_WABuildVersionComponent2(void)              { return 99; }
+static int fake_WABuildVersionComponent3(void)              { return 99; }
+static int fake_WABuildVersionComponent4(void)              { return 99; }
 static void fake_WAHandleFailureInFunction(void)            { return; }
 
 // Hook abort() itself in SharedModules' GOT.
@@ -51,10 +51,8 @@ static void fake_WAHandleFailureInFunction(void)            { return; }
 static void fake_abort(void)                                { return; }
 static void fake_assert_rtn(void)                           { return; }
 
-static unsigned int pb_ret26(id self, SEL cmd) { (void)self;(void)cmd; return 26; }
-static unsigned int pb_ret21(id self, SEL cmd) { (void)self;(void)cmd; return 21; }
-static unsigned int pb_ret74(id self, SEL cmd) { (void)self;(void)cmd; return 74; }
-static unsigned int pb_ret0(id self, SEL cmd)  { (void)self;(void)cmd; return 0;  }
+static unsigned int pb_ret3(id self, SEL cmd)  { (void)self;(void)cmd; return 3;  }
+static unsigned int pb_ret99(id self, SEL cmd) { (void)self;(void)cmd; return 99; }
 
 static id fake_osVersion_getter(id self, SEL cmd) {
     (void)self; (void)cmd;
@@ -236,10 +234,10 @@ static void hook_objc_classes(void) {
     Class cls = (Class)objc_getClass("WAPBClientPayload_UserAgent_AppVersion");
     if (cls) {
         struct { const char *n; IMP fn; } h[] = {
-            { "primary",    (IMP)pb_ret26 },
-            { "secondary",  (IMP)pb_ret21 },
-            { "tertiary",   (IMP)pb_ret74 },
-            { "quaternary", (IMP)pb_ret0  },
+            { "primary",    (IMP)pb_ret3  },
+            { "secondary",  (IMP)pb_ret99 },
+            { "tertiary",   (IMP)pb_ret99 },
+            { "quaternary", (IMP)pb_ret99 },
         };
         for (int i = 0; i < 4; i++) {
             Method m = class_getInstanceMethod(cls, sel_registerName(h[i].n));
