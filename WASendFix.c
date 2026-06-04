@@ -38,9 +38,9 @@ static id fake_WABuildVersion(void)                        { return g_spoofedVer
 static id fake_WABuildHTTPUserAgentString(void)             { return g_spoofedUA; }
 static int fake_WAIsAfterDeprecatedPlatformCutoffDate(void) { return 0; }
 static id fake_WADeprecatedPlatformCutOffDate(void)         { return g_futureDate; }
-static int fake_WABuildVersionComponent1(void)              { return 25; }
-static int fake_WABuildVersionComponent2(void)              { return 1; }
-static int fake_WABuildVersionComponent3(void)              { return 83; }
+static int fake_WABuildVersionComponent1(void)              { return 26; }
+static int fake_WABuildVersionComponent2(void)              { return 21; }
+static int fake_WABuildVersionComponent3(void)              { return 74; }
 static int fake_WABuildVersionComponent4(void)              { return 0; }
 static void fake_WAHandleFailureInFunction(void)            { return; }
 
@@ -51,9 +51,9 @@ static void fake_WAHandleFailureInFunction(void)            { return; }
 static void fake_abort(void)                                { return; }
 static void fake_assert_rtn(void)                           { return; }
 
-static unsigned int pb_ret25(id self, SEL cmd) { (void)self;(void)cmd; return 25; }
-static unsigned int pb_ret1(id self, SEL cmd)  { (void)self;(void)cmd; return 1;  }
-static unsigned int pb_ret83(id self, SEL cmd) { (void)self;(void)cmd; return 83; }
+static unsigned int pb_ret26(id self, SEL cmd) { (void)self;(void)cmd; return 26; }
+static unsigned int pb_ret21(id self, SEL cmd) { (void)self;(void)cmd; return 21; }
+static unsigned int pb_ret74(id self, SEL cmd) { (void)self;(void)cmd; return 74; }
 static unsigned int pb_ret0(id self, SEL cmd)  { (void)self;(void)cmd; return 0;  }
 
 static id fake_osVersion_getter(id self, SEL cmd) {
@@ -108,7 +108,7 @@ static struct hook_entry g_hooks[] = {
     { "_abort",                                 (void*)fake_abort },
     { "___assert_rtn",                          (void*)fake_assert_rtn },
 };
-#define N_HOOKS 11
+#define N_HOOKS (sizeof(g_hooks) / sizeof(g_hooks[0]))
 
 static void rebind_imports_in_image(const struct mach_header_64 *header, intptr_t slide) {
     if (!header || header->magic != MH_MAGIC_64) return;
@@ -206,7 +206,7 @@ next:
             const char *sn = strtab + strx;
             if (sn[0] != '_') continue;
 
-            for (int h = 0; h < N_HOOKS; h++) {
+            for (int h = 0; h < (int)N_HOOKS; h++) {
                 if (name_match(sn, g_hooks[h].name)) {
                     ptrs[e] = g_hooks[h].replacement;
                     break;
@@ -236,9 +236,9 @@ static void hook_objc_classes(void) {
     Class cls = (Class)objc_getClass("WAPBClientPayload_UserAgent_AppVersion");
     if (cls) {
         struct { const char *n; IMP fn; } h[] = {
-            { "primary",    (IMP)pb_ret25 },
-            { "secondary",  (IMP)pb_ret1  },
-            { "tertiary",   (IMP)pb_ret83 },
+            { "primary",    (IMP)pb_ret26 },
+            { "secondary",  (IMP)pb_ret21 },
+            { "tertiary",   (IMP)pb_ret74 },
             { "quaternary", (IMP)pb_ret0  },
         };
         for (int i = 0; i < 4; i++) {
