@@ -23,9 +23,9 @@ static id g_spoofedOsBuild   = NULL;
 static id g_futureDate       = NULL;
 
 static void create_objc_objects(void) {
-    g_spoofedVersion = (id)CFStringCreateWithCString(NULL, "26.24.73", kCFStringEncodingUTF8);
+    g_spoofedVersion = (id)CFStringCreateWithCString(NULL, "3.99.99.99", kCFStringEncodingUTF8);
     g_spoofedUA      = (id)CFStringCreateWithCString(NULL,
-                        "WhatsApp/26.24.73 iOS/17.5.1 Device/iPhone_11_Pro_Max",
+                        "WhatsApp/3.99.99.99 iOS/17.5.1 Device/iPhone_11_Pro_Max",
                         kCFStringEncodingUTF8);
     g_spoofedOsVersion = (id)CFStringCreateWithCString(NULL, "17.5.1", kCFStringEncodingUTF8);
     g_spoofedOsBuild   = (id)CFStringCreateWithCString(NULL, "21F90", kCFStringEncodingUTF8);
