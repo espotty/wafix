@@ -14,10 +14,12 @@ exports:
       - _dlsym
       - _mach_task_self_
       - _vm_protect
+      - _mprotect
+      - _sys_icache_invalidate
       - __dyld_image_count
       - __dyld_get_image_header
       - __dyld_get_image_vmaddr_slide
       - __dyld_get_image_name
       - __dyld_register_func_for_add_image
       - dyld_stub_binder
-...
+
