@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install llvm (provides ld64.lld)
+        run: brew install llvm
+
+      - name: Add llvm to PATH
+        run: echo "$(brew --prefix llvm)/bin" >> $GITHUB_PATH
+
       - name: Build WASendFix.dylib
         run: |
           mkdir -p output
@@ -22,3 +28,4 @@ jobs:
         with:
           name: WASendFix-dylib
           path: output/WASendFix.dylib
+
