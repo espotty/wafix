@@ -51,56 +51,114 @@ WhatsApp Fix (WASendFix.dylib)
 
 الحل:
 عملنا dylib (مكتبة ديناميكية) بتتحقن في واتساب وقت التشغيل
-وبتعترض الـ functions دي وبترجع قيم مزيفة:
+وبتعترض الـ functions دي وبترجع قيم مزيفة.
 
-- WABuildVersion → "3.99.99.99" (نسخة عالية وهمية)
-- WABuildHTTPUserAgentString → "WhatsApp/3.99.99.99 iOS/17.5.1 Device/iPhone_11_Pro_Max"
-- WAIsAfterDeprecatedPlatformCutoffDate → 0 (لا، مش بعد تاريخ الإيقاف)
-- WADeprecatedPlatformCutOffDate → تاريخ بعد 10 سنين
-- WAHandleFailureInFunction → مش بيعمل حاجة (no-op)
-- WABuildVersionComponent 1/2/3/4 → 3, 99, 99, 99
 
-وكمان بنعدل الـ protobuf objects اللي بتتبعت للسيرفر:
-- WAPBClientPayload_UserAgent_AppVersion: primary=3, secondary=99, tertiary=99, quaternary=99
-- WAPBClientPayload_UserAgent: osVersion="17.5.1", osBuildNumber="21F90"
+==================================================
+=== مشاكل البناء (Build Issues) وحلولها ===
+==================================================
 
-الطريقة التقنية:
-الـ dylib بيستخدم طريقتين للتعديل:
+دي أهم حاجة تقرأها لو البيلد فشل على GitHub Actions.
 
-1. Mach-O Indirect Symbol Rebinding:
-   بنمشي على جدول الـ imports (GOT) بتاع WhatsApp و SharedModules
-   وبنبدل الـ function pointers بتاعتنا مكان الأصلية.
-   كده أي كود بيستدعي WABuildVersion مثلاً هيروح للـ function بتاعتنا.
-   ملاحظة: عشان WAHandleFailureInFunction بتتنده داخلياً (direct branch)
-   مش عن طريق الـ GOT، بنكتم ab() و __assert_rtn في الـ GOT كمان
-   عشان نوقف الـ crash.
 
-2. ObjC Method Swizzling:
-   بنستخدم objc_getClass + class_getInstanceMethod + method_setImplementation
-   عشان نبدل الـ getter methods بتاعت الـ protobuf classes.
+--- مشكلة 1: _mprotect و _sys_icache_invalidate مش موجودين ---
 
-المشاكل اللي واجهتنا وحليناها:
+الخطأ:
+  ld: symbol(s) not found for architecture arm64
+  Undefined symbol: _mprotect
+  Undefined symbol: _sys_icache_invalidate
 
-- *** أهمها: رقم النسخة (شوف القسم فوق) ***
-  26.21.74 الحقيقية كسرت الاتصال؛ 3.99.99.99 هي الصح.
+السبب:
+  الـ WASendFix.c بيستخدم mprotect() و sys_icache_invalidate()
+  عشان يعمل ARM64 body patching (تغيير bytes في الذاكرة مباشرة).
+  الـ stub file بتاعة libSystem.B.tbd مكانتش بتعلن عن الـ symbols دي.
 
-- أول نسخة كانت بتعمل crash (SIGSEGV) لأن الـ Mach-O parsing
-  كان بيمشي على كل الـ images المحملة بما فيها الـ shared cache
-  اللي بيبقى فيها بنية مختلفة. الحل: بنفلتر ونمشي بس على
-  WhatsApp و SharedModules.
+الحل:
+  افتح: stubs/usr/lib/libSystem.B.tbd
+  وأضيف تحت قسم symbols:
+      - _mprotect
+      - _sys_icache_invalidate
 
-- كان في bug في قيمة S_LAZY_SYMBOL_POINTERS (كانت 0xa بدل 0x7).
-  ده كان بيخلينا نبص على sections غلط ونكتب في أماكن غلط في الذاكرة.
 
-- استخدام objc_msgSend مع variadic casting كان بيعمل مشاكل
-  في الـ cross-compilation. الحل: استخدمنا CFStringCreateWithCString
-  و CFDateCreate من CoreFoundation مباشرة بدل ما نعدي على ObjC messaging.
+--- مشكلة 2: ld: unknown file type in libSystem.B.tbd ---
 
-- الـ ObjC imageinfo كان فيه flag غلط (64 بدل 0).
+الخطأ:
+  ld: unknown file type in stubs/usr/lib/libSystem.B.tbd
+
+السبب:
+  ملف TBD (Text-Based stub Definition) لازم ينتهي بـ ... (ثلاث نقاط)
+  وهو YAML end-of-document marker. لو الملف ناقصه في الآخر،
+  الـ Apple ld بيرفضه كـ "unknown file type".
+
+الحل:
+  تأكد إن آخر سطر في stubs/usr/lib/libSystem.B.tbd هو:
+  ...
+  (ثلاث نقاط بدون مسافات قبلها أو بعدها)
+
+  الملف الصح يبدأ بـ --- وينتهي بـ ...
+
+
+--- مشكلة 3: macos-latest = macOS 26 (Xcode 26) ---
+
+الخطأ:
+  ld: unknown file type in stubs/usr/lib/libSystem.B.tbd
+  (نفس الخطأ فوق بس السبب مختلف!)
+
+السبب:
+  GitHub Actions غيّر macos-latest لـ macOS 26 مع Xcode 26.
+  الـ Apple ld في Xcode 26 بيرفض صيغة TBD version 4 القديمة
+  حتى لو الملف مكتوب صح!
+
+الحل:
+  في .github/workflows/build.yml غيّر:
+    runs-on: macos-latest
+  لـ:
+    runs-on: macos-14
+
+  macOS 14 فيه Xcode 15 اللي بيدعم TBD v4 عادي.
+
+  ملاحظة مهمة للمستقبل:
+  لو macos-14 بقى قديم جداً ومش متاح، جرب macos-15.
+  الهدف هو Xcode 15 أو 16 مش 26+.
+  لو اضطريت تستخدم macos-latest، حل بديل هو:
+    brew install llvm
+    export PATH="$(brew --prefix llvm)/bin:$PATH"
+  (بس ده بياخد وقت طويل في الـ CI)
+
+
+--- مشكلة 4: clang sysroot warning ---
+
+التحذير:
+  clang: warning: using sysroot for MacOSX but targeting iPhone
+
+السبب:
+  GitHub Actions مش فيه iOS SDK، فـ clang بيستخدم macOS SDK
+  كبديل. ده warning بس مش error، البيلد بيكمل عادي.
+  ما تقلقش منه.
+
+
+==================================================
+=== ملخص سريع للبيلد الناجح ===
+==================================================
+
+Runner:    macos-14  (مش macos-latest!)
+Xcode:     15.4
+Linker:    Apple ld  (مش محتاج ld64.lld لو الـ TBD صح)
+TBD file:  لازم يبدأ بـ --- وينتهي بـ ... وفيه _mprotect و _sys_icache_invalidate
+
+لو البيلد نجح هتلاقي في الـ Artifacts:
+  WASendFix-dylib/WASendFix.dylib
+
+حجم الملف المتوقع: ~50-150 KB
+
+
+==================================================
+=== معلومات تقنية عامة ===
+==================================================
 
 طريقة التنصيب:
-1. نزل WASendFix.dylib (من GitHub Actions → Artifacts → WASendFix-dylib)
-2. استخدم TrollFools/TrollStore عشان تحقنه في واتساب (بيتحط في مجلد Frameworks)
+1. نزل WASendFix.dylib من GitHub Actions → Artifacts → WASendFix-dylib
+2. استخدم TrollFools/TrollStore تحقنه في واتساب (مجلد Frameworks)
 3. افتح واتساب - هيشتغل عادي
 
 ملاحظات:
@@ -108,4 +166,3 @@ WhatsApp Fix (WASendFix.dylib)
 - بيشتغل على أي جهاز iOS 14+ مع jailbreak أو TrollFools/TrollStore
 - الـ strings والتواريخ محفوظة في الذاكرة طول ما التطبيق شغال
 - التاريخ الوهمي محسوب 10 سنين قدام فمش هينتهي قريب
-- مصدر التحقق: سكريبت Frida wasendfix.js (نفس القيم بالظبط = 3.99.99.99)
