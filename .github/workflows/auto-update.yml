@@ -22,44 +22,15 @@ jobs:
           LATEST=$(curl -s "https://itunes.apple.com/lookup?bundleId=net.whatsapp.WhatsApp&country=us" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['results'][0]['version'])")
           echo "latest=$LATEST" >> $GITHUB_OUTPUT
-          echo "Latest WhatsApp version: $LATEST"
+          echo "Latest WhatsApp version on App Store: $LATEST"
 
-          CURRENT=$(grep 'g_spoofedVersion' WASendFix.c | grep -o '"[0-9.]*"' | tr -d '"' | head -1)
-          echo "current=$CURRENT" >> $GITHUB_OUTPUT
-          echo "Current version in code: $CURRENT"
-
-          if [ "$LATEST" != "$CURRENT" ]; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "UPDATE NEEDED: $CURRENT → $LATEST"
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No update needed."
-          fi
-
-      - name: Update version strings in WASendFix.c
-        if: steps.wa_version.outputs.changed == 'true'
-        run: |
-          LATEST="${{ steps.wa_version.outputs.latest }}"
-          CURRENT="${{ steps.wa_version.outputs.current }}"
-
-          # Update spoofed version
-          sed -i "s/\"${CURRENT}\"/\"${LATEST}\"/g" WASendFix.c
-
-          # Update User-Agent string
-          sed -i "s/WhatsApp\/[0-9.]*/WhatsApp\/${LATEST}/g" WASendFix.c
-
-          echo "Updated to $LATEST"
-          grep -E 'g_spoofedVersion|spoofedUA' WASendFix.c | head -5
-
-      - name: Commit and push update
-        if: steps.wa_version.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add WASendFix.c
-          git commit -m "auto: update spoofed version to ${{ steps.wa_version.outputs.latest }}"
-          git push
+          # NOTE: We intentionally do NOT update the spoofed version string.
+          # The spoofed version is locked to "3.99.99.99" which matches the
+          # protocol components (3, 99, 99, 99). Updating to the real App Store
+          # version breaks WhatsApp (freeze) because it mismatches the components.
+          # See HOW_WE_FIXED_IT.txt for the full explanation.
+          echo "Spoofed version stays locked at 3.99.99.99 — no update needed."
+          echo "changed=false" >> $GITHUB_OUTPUT
 
       - name: No update needed
-        if: steps.wa_version.outputs.changed == 'false'
-        run: echo "WhatsApp version unchanged (${{ steps.wa_version.outputs.current }}), nothing to do."
+        run: echo "Version spoof is intentionally locked to 3.99.99.99 (latest App Store: ${{ steps.wa_version.outputs.latest }})"
